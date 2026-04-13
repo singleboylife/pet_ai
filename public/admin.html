@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理员后台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f5; }
+    .header { background: #fff; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .header h1 { font-size: 24px; color: #333; }
+    .container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+    .login-box { background: #fff; padding: 40px; border-radius: 8px; max-width: 400px; margin: 100px auto; }
+    .login-box h2 { margin-bottom: 20px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; color: #666; }
+    .form-group input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+    .btn { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    .btn-primary { background: #1890ff; color: #fff; }
+    .btn-success { background: #52c41a; color: #fff; }
+    .btn-danger { background: #ff4d4f; color: #fff; }
+    .btn:hover { opacity: 0.9; }
+    .card { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .card h3 { margin-bottom: 15px; }
+    table { width: 100%; border-collapse: collapse; }
+    table th, table td { padding: 12px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+    table th { background: #fafafa; font-weight: 600; }
+    .status { padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+    .status-pending { background: #fff7e6; color: #fa8c16; }
+    .status-approved { background: #f6ffed; color: #52c41a; }
+    .status-rejected { background: #fff1f0; color: #ff4d4f; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div id="loginPage" class="login-box">
+    <h2>管理员登录</h2>
+    <div class="form-group">
+      <label>用户名</label>
+      <input type="text" id="phone" placeholder="请输入手机号">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" id="password" placeholder="请输入密码">
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="login()">登录</button>
+  </div>
+
+  <div id="adminPage" class="hidden">
+    <div class="header">
+      <h1>管理员后台</h1>
+    </div>
+    <div class="container">
+      <div class="card">
+        <h3>待审核商家</h3>
+        <table id="pendingTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>店铺名称</th>
+              <th>联系人</th>
+              <th>联系电话</th>
+              <th>申请时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://129.204.226.96:3000/api'
+    let token = localStorage.getItem('admin_token')
+
+    if (token) {
+      document.getElementById('loginPage').classList.add('hidden')
+      document.getElementById('adminPage').classList.remove('hidden')
+      loadPending()
+    }
+
+    async function login() {
+      const phone = document.getElementById('phone').value
+      const password = document.getElementById('password').value
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: phone, password })
+      })
+      const data = await res.json()
+      if (data.code === 200) {
+        token = data.data.token
+        localStorage.setItem('admin_token', token)
+        document.getElementById('loginPage').classList.add('hidden')
+        document.getElementById('adminPage').classList.remove('hidden')
+        loadPending()
+      } else {
+        alert(data.message)
+      }
+    }
+
+    async function loadPending() {
+      const res = await fetch(`${API}/admin/merchants/pending`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.code === 401 || data.code === 403) {
+        localStorage.removeItem('admin_token')
+        token = null
+        document.getElementById('adminPage').classList.add('hidden')
+        document.getElementById('loginPage').classList.remove('hidden')
+        alert(data.message || '登录已过期，请重新登录')
+        return
+      }
+      if (data.code === 200) {
+        const tbody = document.querySelector('#pendingTable tbody')
+        tbody.innerHTML = data.data.map(m => `
+          <tr>
+            <td>${m.id}</td>
+            <td>${m.shop_name}</td>
+            <td>${m.contact_name}</td>
+            <td>${m.contact_phone}</td>
+            <td>${new Date(m.created_at).toLocaleString()}</td>
+            <td>
+              <button class="btn btn-success" onclick="approve(${m.id})">通过</button>
+              <button class="btn btn-danger" onclick="reject(${m.id})">拒绝</button>
+            </td>
+          </tr>
+        `).join('')
+      }
+    }
+
+    async function approve(id) {
+      const res = await fetch(`${API}/admin/merchants/${id}/approve`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await res.json()
+      alert(data.message)
+      if (data.code === 200) loadPending()
+    }
+
+    async function reject(id) {
+      const reason = prompt('拒绝原因（可选）：')
+      const res = await fetch(`${API}/admin/merchants/${id}/reject`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      })
+      const data = await res.json()
+      alert(data.message)
+      if (data.code === 200) loadPending()
+    }
+  </script>
+</body>
+</html>
