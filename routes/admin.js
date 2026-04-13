@@ -80,8 +80,8 @@ router.get('/orders', auth, adminAuth, async (req, res) => {
   }
 
   if (keyword) {
-    query += ' AND (o.order_no LIKE ? OR u.username LIKE ?)'
-    params.push(`%${keyword}%`, `%${keyword}%`)
+    query += ' AND (o.order_no = ? OR u.username = ?)'
+    params.push(keyword, keyword)
   }
 
   query += ' ORDER BY o.created_at DESC LIMIT ? OFFSET ?'
@@ -110,8 +110,8 @@ router.get('/orders', auth, adminAuth, async (req, res) => {
       countParams.push(status)
     }
     if (keyword) {
-      countQuery += ' AND (o.order_no LIKE ? OR u.username LIKE ?)'
-      countParams.push(`%${keyword}%`, `%${keyword}%`)
+      countQuery += ' AND (o.order_no = ? OR u.username = ?)'
+      countParams.push(keyword, keyword)
     }
     const [[{ cnt }]] = await pool.query(countQuery, countParams)
 
