@@ -303,7 +303,14 @@
             ${order.status === 'paid' ? `<button class="btn-ship" onclick="openShipModal(${order.id})">发货</button>` : ''}
             ${order.status === 'shipped' ? `<button class="btn-complete" onclick="completeOrder(${order.id})">完成</button>` : ''}
             ${['pending', 'paid'].includes(order.status) ? `<button class="btn-cancel" onclick="cancelOrder(${order.id})">取消</button>` : ''}
-            <button class="btn-status" onclick="changeStatus(${order.id}, '${order.status}')">改状态</button>
+            <select onchange="changeStatus(${order.id}, this.value, '${order.status}')" style="padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; cursor: pointer;">
+              <option value="">改状态</option>
+              <option value="pending">待支付</option>
+              <option value="paid">已支付</option>
+              <option value="shipped">已发货</option>
+              <option value="completed">已完成</option>
+              <option value="cancelled">已取消</option>
+            </select>
           </td>
         </tr>
       `).join('')
@@ -507,11 +514,43 @@
     }
 
     // 修改订单状态
-    async function changeStatus(orderId, currentStatus) {
-      document.getElementById('statusOrderId').value = orderId
-      document.getElementById('currentStatus').value = getStatusText(currentStatus)
-      document.getElementById('newStatus').value = ''
-      document.getElementById('statusModal').classList.add('active')
+    async function changeStatus(orderId, newStatus, currentStatus) {
+      if (!newStatus) return
+
+      if (newStatus === currentStatus) {
+        alert('新状态与当前状态相同')
+        return
+      }
+
+      if (!confirm(`确认将订单状态从 "${getStatusText(currentStatus)}" 改为 "${getStatusText(newStatus)}" 吗？`)) {
+        loadOrders(currentPage) // 重新加载以重置下拉框
+        return
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: newStatus })
+        })
+        const data = await res.json()
+
+        if (data.code === 200) {
+          alert('状态修改成功！')
+          loadOrders(currentPage)
+          loadStats()
+        } else {
+          alert(data.message)
+          loadOrders(currentPage)
+        }
+      } catch (err) {
+        console.error('操作失败:', err)
+        alert('操作失败')
+        loadOrders(currentPage)
+      }
     }
 
     // 提交状态修改
