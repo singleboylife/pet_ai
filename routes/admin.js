@@ -98,11 +98,20 @@ router.get('/orders', auth, adminAuth, async (req, res) => {
     })
 
     // 获取总数
-    let countQuery = 'SELECT COUNT(*) as cnt FROM orders WHERE 1=1'
+    let countQuery = `
+      SELECT COUNT(*) as cnt
+      FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
+      WHERE 1=1
+    `
     const countParams = []
     if (status) {
-      countQuery += ' AND status = ?'
+      countQuery += ' AND o.status = ?'
       countParams.push(status)
+    }
+    if (keyword) {
+      countQuery += ' AND (o.order_no LIKE ? OR u.username LIKE ?)'
+      countParams.push(`%${keyword}%`, `%${keyword}%`)
     }
     const [[{ cnt }]] = await pool.query(countQuery, countParams)
 

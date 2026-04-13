@@ -225,7 +225,7 @@
     async function loadOrders(page = 1) {
       currentPage = page
       const status = document.getElementById('statusFilter').value
-      const keyword = document.getElementById('keywordInput').value
+      const keyword = document.getElementById('keywordInput').value.trim()
 
       try {
         const params = new URLSearchParams({ page, limit: pageSize })
@@ -238,7 +238,7 @@
         const data = await res.json()
 
         if (data.code === 200) {
-          renderOrders(data.data.list)
+          renderOrders(data.data.list, keyword)
           renderPagination(data.data.total)
         } else {
           alert(data.message)
@@ -250,10 +250,11 @@
     }
 
     // 渲染订单列表
-    function renderOrders(orders) {
+    function renderOrders(orders, keyword) {
       const tbody = document.getElementById('orderTableBody')
       if (!orders || orders.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #999;">暂无订单数据</td></tr>'
+        const msg = keyword ? `未找到包含 "${keyword}" 的订单` : '暂无订单数据'
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 40px; color: #999;">${msg}</td></tr>`
         return
       }
 
@@ -475,14 +476,26 @@
 
     // 修改订单状态
     async function changeStatus(orderId, currentStatus) {
-      const newStatus = prompt('请输入新状态 (pending/paid/shipped/completed/cancelled):', currentStatus)
+      const statusOptions = [
+        { value: 'pending', label: '待支付' },
+        { value: 'paid', label: '已支付' },
+        { value: 'shipped', label: '已发货' },
+        { value: 'completed', label: '已完成' },
+        { value: 'cancelled', label: '已取消' }
+      ]
+
+      const optionsText = statusOptions.map(s => `${s.value} (${s.label})`).join('\n')
+      const newStatus = prompt(`当前状态: ${currentStatus} (${getStatusText(currentStatus)})\n\n请输入新状态:\n${optionsText}`, currentStatus)
+
       if (!newStatus || newStatus === currentStatus) return
 
       const validStatuses = ['pending', 'paid', 'shipped', 'completed', 'cancelled']
       if (!validStatuses.includes(newStatus)) {
-        alert('无效的状态值！')
+        alert('无效的状态值！请输入: pending, paid, shipped, completed 或 cancelled')
         return
       }
+
+      if (!confirm(`确认将订单状态从 "${getStatusText(currentStatus)}" 改为 "${getStatusText(newStatus)}" 吗？`)) return
 
       try {
         const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
