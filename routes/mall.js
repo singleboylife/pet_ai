@@ -181,6 +181,29 @@ router.post('/orders', auth, async (req, res) => {
       for (const item of orderItems) {
         await conn.query('DELETE FROM cart_items WHERE user_id = ? AND product_id = ?', [req.user.id, item.id])
       }
+    } else if (payment_method === 'direct') {
+      // 直接支付模式（不扣钱包余额）
+      await conn.query("UPDATE orders SET status = 'paid' WHERE id = ?", [result.insertId])
+
+      for (const item of orderItems) {
+        await conn.query('UPDATE products SET stock = stock - ?, sales = sales + ? WHERE id = ?', [item.quantity, item.quantity, item.id])
+      }
+      if (pointsUsed > 0) {
+        const newPoints = user.points - pointsUsed
+        await conn.query('UPDATE users SET points = ? WHERE id = ?', [newPoints, req.user.id])
+        await conn.query("INSERT INTO points_transactions (user_id, points, type, description, balance_after) VALUES (?, ?, 'spend', ?, ?)",
+          [req.user.id, -pointsUsed, `订单${orderNo}积分抵扣`, newPoints])
+      }
+      const earnPoints = Math.floor(totalAmount / 10)
+      if (earnPoints > 0) {
+        await conn.query('UPDATE users SET points = points + ? WHERE id = ?', [earnPoints, req.user.id])
+        const [[u2]] = await conn.query('SELECT points FROM users WHERE id = ?', [req.user.id])
+        await conn.query("INSERT INTO points_transactions (user_id, points, type, description, balance_after) VALUES (?, ?, 'earn', ?, ?)",
+          [req.user.id, earnPoints, `订单${orderNo}购物赠积分`, u2.points])
+      }
+      for (const item of orderItems) {
+        await conn.query('DELETE FROM cart_items WHERE user_id = ? AND product_id = ?', [req.user.id, item.id])
+      }
     }
 
     await conn.commit()

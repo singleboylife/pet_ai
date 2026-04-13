@@ -42,8 +42,14 @@
     .actions button { padding: 5px 12px; margin-right: 5px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
     .btn-view { background: #667eea; color: #fff; }
     .btn-ship { background: #28a745; color: #fff; }
+    .btn-complete { background: #17a2b8; color: #fff; }
+    .btn-cancel { background: #dc3545; color: #fff; }
+    .btn-status { background: #ffc107; color: #333; }
     .btn-view:hover { background: #5568d3; }
     .btn-ship:hover { background: #218838; }
+    .btn-complete:hover { background: #138496; }
+    .btn-cancel:hover { background: #c82333; }
+    .btn-status:hover { background: #e0a800; }
 
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
     .modal.active { display: flex; align-items: center; justify-content: center; }
@@ -247,7 +253,7 @@
     function renderOrders(orders) {
       const tbody = document.getElementById('orderTableBody')
       if (!orders || orders.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #999;">暂无订单</td></tr>'
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #999;">暂无订单数据</td></tr>'
         return
       }
 
@@ -257,11 +263,14 @@
           <td>${order.username || '-'}</td>
           <td>¥${order.total_amount}</td>
           <td><span class="status ${order.status}">${getStatusText(order.status)}</span></td>
-          <td>${order.payment_method === 'wallet' ? '钱包' : order.payment_method}</td>
+          <td>${order.payment_method === 'wallet' ? '钱包' : order.payment_method === 'direct' ? '直接支付' : order.payment_method}</td>
           <td>${new Date(order.created_at).toLocaleString('zh-CN')}</td>
           <td class="actions">
             <button class="btn-view" onclick="viewOrder(${order.id})">查看</button>
             ${order.status === 'paid' ? `<button class="btn-ship" onclick="openShipModal(${order.id})">发货</button>` : ''}
+            ${order.status === 'shipped' ? `<button class="btn-complete" onclick="completeOrder(${order.id})">完成</button>` : ''}
+            ${['pending', 'paid'].includes(order.status) ? `<button class="btn-cancel" onclick="cancelOrder(${order.id})">取消</button>` : ''}
+            <button class="btn-status" onclick="changeStatus(${order.id}, '${order.status}')">改状态</button>
           </td>
         </tr>
       `).join('')
@@ -407,6 +416,97 @@
         alert('发货失败')
       }
     })
+
+    // 完成订单
+    async function completeOrder(orderId) {
+      if (!confirm('确认将订单标记为已完成？')) return
+
+      try {
+        const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'completed' })
+        })
+        const data = await res.json()
+
+        if (data.code === 200) {
+          alert('订单已完成！')
+          loadOrders(currentPage)
+          loadStats()
+        } else {
+          alert(data.message)
+        }
+      } catch (err) {
+        console.error('操作失败:', err)
+        alert('操作失败')
+      }
+    }
+
+    // 取消订单
+    async function cancelOrder(orderId) {
+      if (!confirm('确认取消该订单？')) return
+
+      try {
+        const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: 'cancelled' })
+        })
+        const data = await res.json()
+
+        if (data.code === 200) {
+          alert('订单已取消！')
+          loadOrders(currentPage)
+          loadStats()
+        } else {
+          alert(data.message)
+        }
+      } catch (err) {
+        console.error('操作失败:', err)
+        alert('操作失败')
+      }
+    }
+
+    // 修改订单状态
+    async function changeStatus(orderId, currentStatus) {
+      const newStatus = prompt('请输入新状态 (pending/paid/shipped/completed/cancelled):', currentStatus)
+      if (!newStatus || newStatus === currentStatus) return
+
+      const validStatuses = ['pending', 'paid', 'shipped', 'completed', 'cancelled']
+      if (!validStatuses.includes(newStatus)) {
+        alert('无效的状态值！')
+        return
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: newStatus })
+        })
+        const data = await res.json()
+
+        if (data.code === 200) {
+          alert('状态修改成功！')
+          loadOrders(currentPage)
+          loadStats()
+        } else {
+          alert(data.message)
+        }
+      } catch (err) {
+        console.error('操作失败:', err)
+        alert('操作失败')
+      }
+    }
 
     // 状态文本映射
     function getStatusText(status) {

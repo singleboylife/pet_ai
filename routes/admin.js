@@ -147,7 +147,18 @@ router.put('/orders/:id/status', auth, adminAuth, async (req, res) => {
   }
 
   try {
+    const [[order]] = await pool.query('SELECT * FROM orders WHERE id = ?', [req.params.id])
+    if (!order) {
+      return res.json({ code: 404, message: '订单不存在' })
+    }
+
     await pool.query('UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?', [status, req.params.id])
+
+    // 如果改为已完成，记录完成时间
+    if (status === 'completed') {
+      await pool.query('UPDATE orders SET received_at = NOW() WHERE id = ?', [req.params.id])
+    }
+
     res.json({ code: 200, message: '订单状态已更新' })
   } catch (err) {
     res.json({ code: 500, message: err.message })
