@@ -122,9 +122,9 @@
           <option value="completed">已完成</option>
           <option value="cancelled">已取消</option>
         </select>
-        <input type="text" id="keywordInput" placeholder="搜索订单号或用户名">
+        <input type="text" id="keywordInput" placeholder="搜索订单号或用户名" onkeypress="if(event.key==='Enter') loadOrders()">
         <button onclick="loadOrders()">搜索</button>
-        <button onclick="loadOrders()" style="background: #6c757d;">刷新</button>
+        <button onclick="clearSearch()" style="background: #6c757d;">清空</button>
       </div>
     </div>
 
@@ -588,6 +588,13 @@
         alert('操作失败')
       }
     })
+
+    // 清空搜索
+    function clearSearch() {
+      document.getElementById('keywordInput').value = ''
+      document.getElementById('statusFilter').value = ''
+      loadOrders()
+    }
 
     // 状态文本映射
     function getStatusText(status) {
