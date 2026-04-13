@@ -195,6 +195,38 @@
     </div>
   </div>
 
+  <!-- 修改状态弹窗 -->
+  <div class="modal" id="statusModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>修改订单状态</h2>
+        <span class="close" onclick="closeModal('statusModal')">&times;</span>
+      </div>
+      <form id="statusForm">
+        <input type="hidden" id="statusOrderId">
+        <div class="form-group">
+          <label>当前状态</label>
+          <input type="text" id="currentStatus" disabled style="background: #f5f5f5;">
+        </div>
+        <div class="form-group">
+          <label>新状态</label>
+          <select id="newStatus" required>
+            <option value="">请选择状态</option>
+            <option value="pending">待支付</option>
+            <option value="paid">已支付</option>
+            <option value="shipped">已发货</option>
+            <option value="completed">已完成</option>
+            <option value="cancelled">已取消</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" onclick="closeModal('statusModal')">取消</button>
+          <button type="submit" class="btn-primary">确认修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     const API_BASE = 'http://129.204.226.96:3000/api'
     const token = localStorage.getItem('token') || prompt('请输入管理员 Token:')
@@ -476,26 +508,22 @@
 
     // 修改订单状态
     async function changeStatus(orderId, currentStatus) {
-      const statusOptions = [
-        { value: 'pending', label: '待支付' },
-        { value: 'paid', label: '已支付' },
-        { value: 'shipped', label: '已发货' },
-        { value: 'completed', label: '已完成' },
-        { value: 'cancelled', label: '已取消' }
-      ]
+      document.getElementById('statusOrderId').value = orderId
+      document.getElementById('currentStatus').value = getStatusText(currentStatus)
+      document.getElementById('newStatus').value = ''
+      document.getElementById('statusModal').classList.add('active')
+    }
 
-      const optionsText = statusOptions.map(s => `${s.value} (${s.label})`).join('\n')
-      const newStatus = prompt(`当前状态: ${currentStatus} (${getStatusText(currentStatus)})\n\n请输入新状态:\n${optionsText}`, currentStatus)
+    // 提交状态修改
+    document.getElementById('statusForm').addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const orderId = document.getElementById('statusOrderId').value
+      const newStatus = document.getElementById('newStatus').value
 
-      if (!newStatus || newStatus === currentStatus) return
-
-      const validStatuses = ['pending', 'paid', 'shipped', 'completed', 'cancelled']
-      if (!validStatuses.includes(newStatus)) {
-        alert('无效的状态值！请输入: pending, paid, shipped, completed 或 cancelled')
+      if (!newStatus) {
+        alert('请选择新状态')
         return
       }
-
-      if (!confirm(`确认将订单状态从 "${getStatusText(currentStatus)}" 改为 "${getStatusText(newStatus)}" 吗？`)) return
 
       try {
         const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
@@ -510,6 +538,7 @@
 
         if (data.code === 200) {
           alert('状态修改成功！')
+          closeModal('statusModal')
           loadOrders(currentPage)
           loadStats()
         } else {
@@ -519,7 +548,7 @@
         console.error('操作失败:', err)
         alert('操作失败')
       }
-    }
+    })
 
     // 状态文本映射
     function getStatusText(status) {
