@@ -6,20 +6,43 @@ const pool    = require('../database/db')
 
 // 注册
 router.post('/register', async (req, res) => {
-  const { username, password, nickname } = req.body
+  const { username, password, nickname, phone, code } = req.body
   if (!username || !password) return res.json({ code: 400, message: '用户名和密码不能为空' })
   if (username.length < 3 || username.length > 20) return res.json({ code: 400, message: '用户名长度为3-20位' })
   if (password.length < 6) return res.json({ code: 400, message: '密码不能少于6位' })
+
+  // 如果提供了手机号，必须验证
+  if (phone) {
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+      return res.json({ code: 400, message: '请输入正确的手机号' })
+    }
+    if (!code) {
+      return res.json({ code: 400, message: '请输入验证码' })
+    }
+
+    // 验证验证码
+    const { verifyCode } = require('../utils/sms')
+    const verifyResult = await verifyCode(phone, code, 'register')
+    if (!verifyResult.success) {
+      return res.json({ code: 400, message: verifyResult.message })
+    }
+  }
 
   try {
     const [[exists]] = await pool.query('SELECT id FROM users WHERE username = ?', [username])
     if (exists) return res.json({ code: 400, message: '用户名已被使用' })
 
+    // 检查手机号是否已注册
+    if (phone) {
+      const [[phoneExists]] = await pool.query('SELECT id FROM users WHERE phone = ?', [phone])
+      if (phoneExists) return res.json({ code: 400, message: '该手机号已注册' })
+    }
+
     const hash = await bcrypt.hash(password, 10)
     const nick = nickname || username
     const [result] = await pool.query(
-      'INSERT INTO users (username, password, nickname) VALUES (?, ?, ?)',
-      [username, hash, nick]
+      'INSERT INTO users (username, password, nickname, phone, phone_verified) VALUES (?, ?, ?, ?, ?)',
+      [username, hash, nick, phone || null, phone ? 1 : 0]
     )
     const userId = result.insertId
 

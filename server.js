@@ -23,6 +23,7 @@ app.use(logger.requestMiddleware())
 // ── 路由注册 ───────────────────────────────────────────────
 app.use('/api/auth',     require('./routes/auth'))
 app.use('/api/user',     require('./routes/user'))
+app.use('/api/security', require('./routes/security'))
 app.use('/api/ai',       require('./routes/ai'))
 app.use('/api/social',   require('./routes/social'))
 app.use('/api/baike',    require('./routes/baike'))
